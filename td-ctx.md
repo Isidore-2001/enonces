@@ -6,19 +6,19 @@
 
 # Table des matières
 
-1.  [Introduction à l'environnement de programmation](#org9d8fdcf)
-    1.  [Un noyau minimal](#org1b70085)
-    2.  [Prérequis](#org46b133e)
-    3.  [Librairie minimale d'entrée/sortie](#org597eabc)
-2.  [Retour à un contexte](#orgc9bc571)
+1.  [Retour à un contexte](#orgc9bc571)
     1.  [La bibliothèque Unix standard](#org89337bd)
     2.  [Exercice : Illustration du mécanisme de `setjmp()=/=longjmp()`](#orgca4d548)
     3.  [Exercice : Lisez la documentation](#org330a358)
     4.  [Exercice : Utilisation d'un retour dans la pile d'exécution](#org6aba5c3)
-3.  [Contexte d'exécution](#org18a04d1)
+2.  [Contexte d'exécution](#org18a04d1)
     1.  [Code assembleur](#org2dccfdf)
     2.  [Première réalisation pratique](#org7137923)
     3.  [Exercice : try / throw](#orga492ef1)
+3.  [Introduction à la programmation noyau](#org9d8fdcf)
+    1.  [Un noyau minimal](#org1b70085)
+    2.  [Prérequis](#org46b133e)
+    3.  [Librairie minimale d'entrée/sortie](#org597eabc)
 4.  [Création d'un contexte d'exécution](#org5750801)
     1.  [Segment mémoire](#org76d462c)
     2.  [Exercice : structure](#orgd1d157d)
@@ -39,72 +39,6 @@
 9.  [Un pilote de péripherique](#orga60007c)
     1.  [Exercice : Lire les touches saisies au clavier](#orgabfff48)
     2.  [Exercice : pilote du clavier](#org7e6072c)
-
-
-<a id="org9d8fdcf"></a>
-
-# Introduction à l'environnement de programmation
-
-Cela fait maintenant quelques années que vous écrivez des logiciels, et pourtant, nombreux parmi vous sont ceux qui n'ont encore jamais écrit un « premier logiciel », c'est-à-dire un logiciel qui s'exécute en premier, lorsque la machine démarre. C'est ce que nous allons faire maintenant.
-
-
-<a id="org1b70085"></a>
-
-## Un noyau minimal
-
-Vous trouverez en suivant ce lien vers le dépôt [my-kernel](https://gitlab.univ-lille.fr/gilles.grimaud/my-kernel) qui vous propose un logiciel minimal. Le Makefile proposé compile le programme présent dans `src/main.c` et produit l'image iso d'un disque amorçable sur architecture x86. Pour exécuter ce « premier logiciel » il vous faudra soit:
-
-1.  flasher l'image iso sur un support persistant (clef usb, disque) ; soit
-2.  utiliser une machine virtuelle pour démarrer l'image iso produite.
-
-Nous privilégions cette seconde solution dans une phase de développement et de test, car elle est plus confortable que la première (les cycles compilation/exécution sont plus courts et le débuggage en est facilité).
-
-Pour démarrer une image iso en ligne de commande, nous vous recommandons l'utilisation de [qemu](https://www.qemu.org).
-
-```sh
-qemu-system-x86_64 -boot d -m 2048 -cdrom mykernel.iso -curses
-```
-
-Cette commande est directement disponible dans le `Makefile` proposé avec :
-
-```sh
-make run 
-```
-
-Pour produire une image iso à partir d'un binaire exécutable nous utilisons l'utilitaire grub. Vous pouvez voir la recette de cuisine que nous vous proposons dans le `Makefile`. Pour l'utiliser faites simplement :
-
-```sh
-make
-```
-
-Le Makefile compile d’abord votre fichier source en un `.o`, puis il \*link\*e votre `.o` avec quelques autres éléments et produit un fichier binaire, et enfin, il utilise les utilitaires grub-mkrescue et xorriso pour produire le fichier iso. Notez en faisant de la sorte, techniquement, le premier permier programme exécuté est le bios, qui charge le logiciel grub, puis grub affiche un menu qui permet de charger et de lancer votre logiciel (comme s'il lançait un noyau de système d'exploitation).
-
-
-<a id="org46b133e"></a>
-
-## Prérequis
-
-Notez donc que pour que cela fonctionne correctement vous aurez besoin des outils suivants :
-
--   `gcc`
--   `grub-common`
--   `xorriso`
--   `qemu`
-
-Ces outils sont installés sur les machines des salles de tp. Vous pouvez vous y connecter (via le VPN) avec :
-
-    ssh <login>@a<#salle>p<#poste>.fil.univ-lille1.fr
-
-Sinon vous pouvez installer les outils sur votre distribution linux préférée. L'installation sur microsoft windows et macos X n'est pas impossible, mais est plus délicate&#x2026; Quelques explications sont données dans le `README.md` du dépôt pour mettre en place un setup macos X.
-
-
-<a id="org597eabc"></a>
-
-## Librairie minimale d'entrée/sortie
-
-Comme cela a été expliqué précédemment, c'est un fichier `.c` qui est compilé pour produire l'image iso. Cependant il est important de noter que le langage C utilisé ici est du C « bare-metal ». Au contraire d'un programme C classique, il ne s'exécute pas « au-dessus » d'un système d'exploitation et vous ne disposez donc d'aucune des librairies dont vous avez l'habitude. Ainsi des fonctions telles que \`printf\`, \`malloc\`, \`fopen\`, \`fork\`, \`exit\`&#x2026; qui sont implémentées par la \`glibc\` et qui utilisent des services de votre système d'exploitation ne sont pas disponibles.
-
-Pour vous aider, le fichier \`main.c\` que l'on vous propose réalise néanmoins deux fonctions de base. La première est d'initialiser les mécanismes fondamentaux des architectures intel. Il s'agit d'une part de la [GDT](https://en.wikipedia.org/wiki/Global_Descriptor_Table), l'initialisation mise en place par le \`main.c\` fourni vous donne accès à toute la mémoire de la machine, sans restriction. D'autre part il s'agit de l'[IDT](https://en.wikipedia.org/wiki/Interrupt_descriptor_table) qui gère sur les architectures intel les mécanismes d'interruption au sein du microprocesseur. La seconde fonction qu'assure le fichier `main.c` est de vous proposer une implémentation minimaliste des fonctions `putc()`, `puts()` et `puthex()`. Grâce à ces fonctions vous pouvez envoyer sur l'écran des caractères, et donc afficher des informations. L'écran est configuré pour fonctionner en mode « texte » 80 colonnes, 25 lignes. Dans ce mode vidéo (défini dans les normes VGA par IBM), le contrôleur graphique (la carte graphique) partage un segment de sa mémoire avec le microprocesseur. Du point de vue du processeur, la mémoire du contrôleur graphique est accessible à l'adresse \`0xA0000\` mais en mode texte, les informations utilisées par la carte graphique pour produire l'image sont accessibles au microprocesseur à partir de l'adresse \`0xb8000\`. De plus le contrôleur graphique peut gérer le clignotement d'un curseur, via des registres matériels spécifiques. L'implémentation de la fonction `putc()` programme ce registre pour gérer le curseur matériel. Pour programmer les registres des périphériques matériels, les architectures intel proposent les instructions machine `in` et `out`. La base de code que l'on vous propose définit dans `include/ioport.h` une fonction C `unsigned char _inb(int port);` et une fonction C `void _outb(int port, unsigned char val);`, qui sont notamment utilisées pour piloter la position du curseur matériel.
 
 
 <a id="orgc9bc571"></a>
@@ -261,6 +195,73 @@ int main()
     printf("product = %d\n", product); 
 }
 ```
+
+
+<a id="org9d8fdcf"></a>
+
+# Introduction à la programmation noyau
+
+Cela fait maintenant quelques années que vous écrivez des logiciels, et pourtant, nombreux parmi vous sont ceux qui n'ont encore jamais écrit un « premier logiciel », c'est-à-dire un logiciel qui s'exécute en premier, lorsque la machine démarre. C'est ce que nous allons faire maintenant.
+
+
+<a id="org1b70085"></a>
+
+## Un noyau minimal
+
+Vous trouverez en suivant ce lien vers le dépôt [my-kernel](https://gitlab.univ-lille.fr/gilles.grimaud/my-kernel) qui vous propose un logiciel minimal. Le Makefile proposé compile le programme présent dans `src/main.c` et produit l'image iso d'un disque amorçable sur architecture x86. Pour exécuter ce « premier logiciel » il vous faudra soit:
+
+1.  flasher l'image iso sur un support persistant (clef usb, disque) ; soit
+2.  utiliser une machine virtuelle pour démarrer l'image iso produite.
+
+Nous privilégions cette seconde solution dans une phase de développement et de test, car elle est plus confortable que la première (les cycles compilation/exécution sont plus courts et le débuggage en est facilité).
+
+Pour démarrer une image iso en ligne de commande, nous vous recommandons l'utilisation de [qemu](https://www.qemu.org).
+
+```sh
+qemu-system-x86_64 -boot d -m 2048 -cdrom mykernel.iso -curses
+```
+
+Cette commande est directement disponible dans le `Makefile` proposé avec :
+
+```sh
+make run 
+```
+
+Pour produire une image iso à partir d'un binaire exécutable nous utilisons l'utilitaire grub. Vous pouvez voir la recette de cuisine que nous vous proposons dans le `Makefile`. Pour l'utiliser faites simplement :
+
+```sh
+make
+```
+
+Le Makefile compile d’abord votre fichier source en un `.o`, puis il \*link\*e votre `.o` avec quelques autres éléments et produit un fichier binaire, et enfin, il utilise les utilitaires grub-mkrescue et xorriso pour produire le fichier iso. Notez en faisant de la sorte, techniquement, le premier permier programme exécuté est le bios, qui charge le logiciel grub, puis grub affiche un menu qui permet de charger et de lancer votre logiciel (comme s'il lançait un noyau de système d'exploitation).
+
+
+<a id="org46b133e"></a>
+
+## Prérequis
+
+Notez donc que pour que cela fonctionne correctement vous aurez besoin des outils suivants :
+
+-   `gcc`
+-   `grub-common`
+-   `xorriso`
+-   `qemu`
+
+Ces outils sont installés sur les machines des salles de tp. Vous pouvez vous y connecter (via le VPN) avec :
+
+    ssh <login>@a<#salle>p<#poste>.fil.univ-lille1.fr
+
+Sinon vous pouvez installer les outils sur votre distribution linux préférée. L'installation sur microsoft windows et macos X n'est pas impossible, mais est plus délicate&#x2026; Quelques explications sont données dans le `README.md` du dépôt pour mettre en place un setup macos X.
+
+
+<a id="org597eabc"></a>
+
+## Librairie minimale d'entrée/sortie
+
+Comme cela a été expliqué précédemment, c'est un fichier `.c` qui est compilé pour produire l'image iso. Cependant il est important de noter que le langage C utilisé ici est du C « bare-metal ». Au contraire d'un programme C classique, il ne s'exécute pas « au-dessus » d'un système d'exploitation et vous ne disposez donc d'aucune des librairies dont vous avez l'habitude. Ainsi des fonctions telles que \`printf\`, \`malloc\`, \`fopen\`, \`fork\`, \`exit\`&#x2026; qui sont implémentées par la \`glibc\` et qui utilisent des services de votre système d'exploitation ne sont pas disponibles.
+
+Pour vous aider, le fichier \`main.c\` que l'on vous propose réalise néanmoins deux fonctions de base. La première est d'initialiser les mécanismes fondamentaux des architectures intel. Il s'agit d'une part de la [GDT](https://en.wikipedia.org/wiki/Global_Descriptor_Table), l'initialisation mise en place par le \`main.c\` fourni vous donne accès à toute la mémoire de la machine, sans restriction. D'autre part il s'agit de l'[IDT](https://en.wikipedia.org/wiki/Interrupt_descriptor_table) qui gère sur les architectures intel les mécanismes d'interruption au sein du microprocesseur. La seconde fonction qu'assure le fichier `main.c` est de vous proposer une implémentation minimaliste des fonctions `putc()`, `puts()` et `puthex()`. Grâce à ces fonctions vous pouvez envoyer sur l'écran des caractères, et donc afficher des informations. L'écran est configuré pour fonctionner en mode « texte » 80 colonnes, 25 lignes. Dans ce mode vidéo (défini dans les normes VGA par IBM), le contrôleur graphique (la carte graphique) partage un segment de sa mémoire avec le microprocesseur. Du point de vue du processeur, la mémoire du contrôleur graphique est accessible à l'adresse \`0xA0000\` mais en mode texte, les informations utilisées par la carte graphique pour produire l'image sont accessibles au microprocesseur à partir de l'adresse \`0xb8000\`. De plus le contrôleur graphique peut gérer le clignotement d'un curseur, via des registres matériels spécifiques. L'implémentation de la fonction `putc()` programme ce registre pour gérer le curseur matériel. Pour programmer les registres des périphériques matériels, les architectures intel proposent les instructions machine `in` et `out`. La base de code que l'on vous propose définit dans `include/ioport.h` une fonction C `unsigned char _inb(int port);` et une fonction C `void _outb(int port, unsigned char val);`, qui sont notamment utilisées pour piloter la position du curseur matériel.
+
 
 
 <a id="org18a04d1"></a>
