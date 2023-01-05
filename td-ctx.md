@@ -6,7 +6,7 @@
 
 # Table des matières
 
-1.  [Retour à un contexte](#orgc9bc571)
+1.  [Avant-propos autour de la notion de contexte l'exécution](#orgc9bc571)
     1.  [La bibliothèque Unix standard](#org89337bd)
     2.  [Exercice : Illustration du mécanisme de `setjmp()=/=longjmp()`](#orgca4d548)
     3.  [Exercice : Lisez la documentation](#org330a358)
@@ -43,7 +43,7 @@
 
 <a id="orgc9bc571"></a>
 
-# Retour à un contexte
+# Avant-propos autour de la notion de contexte d'exécution
 
 Pour certaines applications, l'exécution du programme doit être reprise en un point particulier. Un point d'exécution est caractérisé par l'état courant de la pile d'appel et des registres du processeur ; on parle de **contexte**.
 
